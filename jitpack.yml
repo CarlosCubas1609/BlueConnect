@@ -1,0 +1,20 @@
+# JitPack build configuration. See https://docs.jitpack.io/building/
+#
+# This project needs JDK 17 (Android Gradle Plugin 8.13 requirement). JitPack defaults to
+# JDK 8/11, so we pin it explicitly.
+#
+# The `install` step publishes every library module to JitPack's local Maven cache so the
+# resulting artifacts are available as:
+#   <SDK_GROUP_ID>:core:<tag>
+#   <SDK_GROUP_ID>:bluetooth:<tag>
+#   <SDK_GROUP_ID>:storage-datastore:<tag>
+#   <SDK_GROUP_ID>:parser-weight:<tag>
+#   <SDK_GROUP_ID>:ui:<tag>
+#
+# `:app` is the sample and is intentionally NOT published.
+
+jdk:
+  - openjdk17
+
+install:
+  - ./gradlew :core:publishToMavenLocal :bluetooth:publishToMavenLocal :storage-datastore:publishToMavenLocal :parser-weight:publishToMavenLocal :ui:publishToMavenLocal -PSDK_VERSION=$VERSION

@@ -1,5 +1,7 @@
 # cc-blueconnect-sdk
 
+[![](https://jitpack.io/v/CarlosCubas1609/BlueConnect.svg)](https://jitpack.io/#CarlosCubas1609/BlueConnect)
+
 Lightweight Android Bluetooth toolkit for **scanning, connecting, and reading frames** from
 BLE GATT, Bluetooth Classic (SPP/RFCOMM), and Chipsea-style advertisement-broadcasting devices
 — behind a single coroutine-friendly API.
@@ -12,14 +14,16 @@ add-on modules so the core stays small.
 
 ## Modules
 
-| Module                | Artifact                                        | Purpose                                                            |
-|-----------------------|-------------------------------------------------|--------------------------------------------------------------------|
-| `:core`               | `com.ccubas:cc-blueconnect-core:1.0.0`               | Public API surface, models, `ConnectionStrategy`, storage interface |
-| `:bluetooth`          | `com.ccubas:cc-blueconnect-bluetooth:1.0.0`          | Real implementation: GATT, Classic, Chipsea, Demo, scanning, permissions |
-| `:storage-datastore`  | `com.ccubas:cc-blueconnect-storage-datastore:1.0.0`  | Optional Preferences DataStore adapter for auto-reconnect          |
-| `:parser-weight`      | `com.ccubas:cc-blueconnect-parser-weight:1.0.0`      | Optional decoder for LP7516, BLE Weight Scale, Chipsea v1.1/v2.0   |
-| `:ui`                 | `com.ccubas:cc-blueconnect-ui:1.0.0`                 | Optional Compose helpers: permission flow + generic frame viewer    |
-| `:app`                | (not published)                                 | Sample app showing how to wire everything together                 |
+All artifacts share the JitPack groupId `com.github.CarlosCubas1609.BlueConnect`.
+
+| Module                | Artifact id          | Purpose                                                            |
+|-----------------------|----------------------|--------------------------------------------------------------------|
+| `:core`               | `core`               | Public API surface, models, `ConnectionStrategy`, storage interface |
+| `:bluetooth`          | `bluetooth`          | Real implementation: GATT, Classic, Chipsea, Demo, scanning, permissions |
+| `:storage-datastore`  | `storage-datastore`  | Optional Preferences DataStore adapter for auto-reconnect          |
+| `:parser-weight`      | `parser-weight`      | Optional decoder for LP7516, BLE Weight Scale, Chipsea v1.1/v2.0   |
+| `:ui`                 | `ui`                 | Optional Compose helpers: permission flow + generic frame viewer    |
+| `:app`                | (not published)      | Sample app showing how to wire everything together                 |
 
 A consumer that only needs scan + connect can depend on `:core` + `:bluetooth`. The other
 three are opt-in.
@@ -28,19 +32,36 @@ three are opt-in.
 
 ## Installation
 
-Gradle Kotlin DSL:
+The SDK is published via [JitPack](https://jitpack.io). Add the repository, then pick the
+modules you need.
+
+`settings.gradle.kts`:
+
+```kotlin
+dependencyResolutionManagement {
+    repositories {
+        google()
+        mavenCentral()
+        maven("https://jitpack.io")
+    }
+}
+```
+
+`<module>/build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("com.ccubas:cc-blueconnect-core:1.0.0")
-    implementation("com.ccubas:cc-blueconnect-bluetooth:1.0.0")
+    implementation("com.github.CarlosCubas1609.BlueConnect:bluetooth:1.0.0")
 
-    // Optional add-ons:
-    implementation("com.ccubas:cc-blueconnect-storage-datastore:1.0.0")
-    implementation("com.ccubas:cc-blueconnect-parser-weight:1.0.0")
-    implementation("com.ccubas:cc-blueconnect-ui:1.0.0")
+    // Optional add-ons (each one is opt-in):
+    implementation("com.github.CarlosCubas1609.BlueConnect:storage-datastore:1.0.0")
+    implementation("com.github.CarlosCubas1609.BlueConnect:parser-weight:1.0.0")
+    implementation("com.github.CarlosCubas1609.BlueConnect:ui:1.0.0")
 }
 ```
+
+`:core` is pulled in transitively by every other module — you don't have to declare it
+explicitly.
 
 Minimum supported Android: **API 24** (Android 7.0).
 
@@ -359,9 +380,6 @@ card driven by the optional weight parser. Build and install it on a real device
 ./gradlew :app:installDebug
 ```
 
-> Note: the bundled `gradlew.bat` ships with a known Java 20+ incompatibility (passes an empty
-> `-classpath`). On Windows + JDK 20+, run via `bash gradlew …` or upgrade the wrapper:
-> `./gradlew wrapper --gradle-version 8.13.1`.
 
 ---
 
@@ -379,9 +397,34 @@ card driven by the optional weight parser. Build and install it on a real device
 
 ---
 
+## Publishing a new release
+
+The repo is configured for JitPack-via-tag releases:
+
+1. Bump `SDK_VERSION` in `gradle.properties` if you want a default for local builds (JitPack
+   itself overrides it from the Git tag).
+2. Commit, then create a Git tag matching the version: `git tag 1.0.1 && git push --tags`.
+3. JitPack picks up the tag automatically. Open https://jitpack.io/#CarlosCubas1609/BlueConnect
+   and click **Get it** on the new tag if you want to force the build right away.
+4. The build runs `./gradlew :core:publishToMavenLocal …` for every library module
+   (see `jitpack.yml`); the resulting AARs become available a couple of minutes later.
+
+Local sanity check before tagging:
+
+```bash
+./gradlew publishToMavenLocal
+ls ~/.m2/repository/com/github/CarlosCubas1609/BlueConnect/
+```
+
+You should see `core/`, `bluetooth/`, `storage-datastore/`, `parser-weight/`, `ui/` each
+containing the version directory you published.
+
+> The bundled `gradlew.bat` ships with a known Java 20+ incompatibility (passes an empty
+> `-classpath`). On Windows + JDK 20+, run via `bash gradlew …` or upgrade the wrapper.
+
 ## Roadmap
 
-- Maven publishing setup (`maven-publish` + signing) — TBD.
 - Optional `:hilt` module to skip the boilerplate above.
 - `BluetoothFrame` write API for two-way protocols (GATT writes, SPP writes).
 - More built-in decoders as they're requested (BLE Heart Rate, Battery Service, etc.).
+- Maven Central publishing (real `com.ccubas` groupId) once Sonatype + GPG flow is set up.

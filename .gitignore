@@ -1,15 +1,112 @@
-*.iml
-.gradle
-/local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
-.DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
+# ============================================================
+# Android / Gradle
+# ============================================================
+
+# Build outputs (root + every module)
+build/
+**/build/
+out/
+**/out/
+release/
+
+# Gradle caches and daemons
+.gradle/
+**/.gradle/
+gradle-app.setting
+!gradle-wrapper.jar
+!gradle-wrapper.properties
+
+# Kotlin compiler caches
+.kotlin/
+**/.kotlin/
+.kotlintest/
+
+# Local SDK / signing config (machine-specific)
 local.properties
+keystore.properties
+*.jks
+*.keystore
+
+# Android Studio captures
+captures/
+
+# Native builds
+.externalNativeBuild/
+.cxx/
+
+# Lint
+lint/intermediates/
+lint/generated/
+lint/outputs/
+lint/tmp/
+lint/reports/
+
+# Generated APKs / AABs / AARs (don't commit binaries)
+*.apk
+*.aab
+*.aar
+*.ap_
+*.dex
+
+# ============================================================
+# IDE
+# ============================================================
+
+# IntelliJ / Android Studio — ignore everything inside .idea except
+# a few project-shared files that ARE safe to commit.
+.idea/
+!.idea/codeStyles/
+!.idea/inspectionProfiles/
+!.idea/runConfigurations/
+
+# Module files
+*.iml
+*.ipr
+*.iws
+
+# VS Code
+.vscode/
+
+# Eclipse
+.project
+.classpath
+.settings/
+
+# ============================================================
+# OS
+# ============================================================
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.directory
+.Trash-*
+
+# ============================================================
+# Logs / temp
+# ============================================================
+
+*.log
+hs_err_pid*
+*.tmp
+*.bak
+
+# ============================================================
+# JitPack
+# ============================================================
+# JitPack publishes from a clean checkout, no extra setup needed.
+
+# ============================================================
+# Project-local Claude state
+# ============================================================
+.claude/
