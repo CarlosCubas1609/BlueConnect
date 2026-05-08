@@ -56,6 +56,13 @@ import kotlinx.coroutines.launch
 fun FrameViewerScreen(
     client: BlueConnectClient,
     modifier: Modifier = Modifier,
+    /**
+     * Override the default connect behavior. When null (the default), tapping a device row
+     * calls [BlueConnectClient.connect] with auto-selected strategy. Apps that want to ask
+     * the user which protocol to use can intercept here — for example by showing a
+     * [com.ccubas.blueconnect.ui.dialog.ProtocolPickerDialog].
+     */
+    onConnectClick: ((BluetoothDevice) -> Unit)? = null,
     extraSections: LazyListScope.(FrameViewerSlots) -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
@@ -103,7 +110,9 @@ fun FrameViewerScreen(
             onStopScan = { client.stopScan() },
             onDisconnect = { client.disconnect() },
             onClearDevices = { client.clearDevices() },
-            onConnect = { device -> client.connect(device) },
+            onConnect = { device ->
+                onConnectClick?.invoke(device) ?: client.connect(device)
+            },
             onDismissError = { scanErrorMessage = null },
             extraSections = extraSections,
         )

@@ -39,6 +39,12 @@ sealed class ConnectionStrategy {
         override val description = "Will try: BLE → Classic → Chipsea"
     }
 
+    /** Classic first, fall back to BLE, then Chipsea. */
+    data object ClassicFirst : ConnectionStrategy() {
+        override val protocols = listOf(ManagerType.Classic, ManagerType.BLE, ManagerType.Chipsea)
+        override val description = "Will try: Classic → BLE → Chipsea"
+    }
+
     /** Chipsea first, fall back to BLE, then Classic — for devices of unknown type. */
     data object ChipseaFirst : ConnectionStrategy() {
         override val protocols = listOf(ManagerType.Chipsea, ManagerType.BLE, ManagerType.Classic)
@@ -88,6 +94,7 @@ sealed class ConnectionStrategy {
          */
         fun fromProtocolString(protocolString: String): ConnectionStrategy? = when (protocolString) {
             "BleFirst" -> BleFirst
+            "ClassicFirst" -> ClassicFirst
             "ChipseaFirst" -> ChipseaFirst
 
             "BLE" -> BleOnly
@@ -102,6 +109,7 @@ sealed class ConnectionStrategy {
 
             else -> when {
                 protocolString.contains("BleFirst", ignoreCase = true) -> BleFirst
+                protocolString.contains("ClassicFirst", ignoreCase = true) -> ClassicFirst
                 protocolString.contains("ChipseaFirst", ignoreCase = true) -> ChipseaFirst
                 protocolString.contains("BLE", ignoreCase = true) -> BleOnly
                 protocolString.contains("CLASSIC", ignoreCase = true) -> ClassicOnly

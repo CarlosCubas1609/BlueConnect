@@ -515,6 +515,7 @@ internal class BlueConnectClientImpl internal constructor(
                     currentManagerType?.let { managerType ->
                         val protocolToSave = when (strategy) {
                             is ConnectionStrategy.BleFirst -> "BleFirst"
+                            is ConnectionStrategy.ClassicFirst -> "ClassicFirst"
                             is ConnectionStrategy.ChipseaFirst -> "ChipseaFirst"
                             else -> when (managerType) {
                                 is ManagerType.BLE -> "BLE"

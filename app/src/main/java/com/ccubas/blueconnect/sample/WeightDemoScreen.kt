@@ -1,5 +1,7 @@
 package com.ccubas.blueconnect.sample
 
+import android.annotation.SuppressLint
+import android.bluetooth.BluetoothDevice
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -9,7 +11,10 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.tooling.preview.Preview
@@ -19,18 +24,51 @@ import com.ccubas.blueconnect.core.model.BluetoothFrame
 import com.ccubas.blueconnect.parser.weight.WeightFrameParser
 import com.ccubas.blueconnect.parser.weight.WeightReading
 import com.ccubas.blueconnect.ui.FrameViewerScreen
+import com.ccubas.blueconnect.ui.dialog.ProtocolPickerDialog
 
 /**
- * Demo screen that layers the weight parser on top of the generic [FrameViewerScreen].
+ * Demo screen that shows how to layer two SDK opt-ins on top of [FrameViewerScreen]:
  *
- * This is intentionally in the sample app, not in the library: the SDK stays generic and the
- * weight-specific UI sits next to the consumer code that actually needs it.
+ * 1. Ask the user which connection protocol to try, via [ProtocolPickerDialog]
+ *    (instead of letting the SDK auto-pick).
+ * 2. Decode the resulting frame as a weight reading via the optional `:parser-weight`
+ *    module and render it in a Material card.
+ *
+ * This file lives in `:app` on purpose — the SDK stays generic; demo behavior sits next to
+ * the consumer code that actually wants it.
  */
+@SuppressLint("MissingPermission")
 @Composable
 fun WeightDemoScreen(client: BlueConnectClient) {
-    FrameViewerScreen(client = client) { slots ->
+    var deviceForPicker by remember { mutableStateOf<BluetoothDevice?>(null) }
+
+    FrameViewerScreen(
+        client = client,
+        onConnectClick = { device -> deviceForPicker = device },
+    ) { slots ->
         item { ParsedWeightCard(frame = slots.frame) }
     }
+
+    deviceForPicker?.let { device ->
+        ProtocolPickerDialog(
+            deviceLabel = device.deviceLabel(),
+            onDismiss = { deviceForPicker = null },
+            onSelect = { strategy ->
+                client.connect(device, forcedStrategy = strategy)
+                deviceForPicker = null
+            },
+        )
+    }
+}
+
+@SuppressLint("MissingPermission")
+private fun BluetoothDevice.deviceLabel(): String {
+    val safeName = try {
+        name.orEmpty()
+    } catch (e: SecurityException) {
+        ""
+    }
+    return if (safeName.isNotEmpty()) "$safeName ($address)" else address
 }
 
 @Composable

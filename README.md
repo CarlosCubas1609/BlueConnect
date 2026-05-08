@@ -137,6 +137,7 @@ When a device speaks one protocol, just connect and you're done. When it might s
 | `ClassicOnly`   | Classic (SPP)                           | Known Classic-only device (e.g. LP7516)           |
 | `ChipseaOnly`   | Chipsea advertisement                   | Known Chipsea / OKOK / similar broadcast scale    |
 | `BleFirst`      | BLE → Classic → Chipsea                 | Unknown device, BLE-capable hardware              |
+| `ClassicFirst`  | Classic → BLE → Chipsea                 | Unknown device, likely Classic                    |
 | `ChipseaFirst`  | Chipsea → BLE → Classic                 | Unknown device, looks broadcast-only              |
 | `DemoOnly`      | Synthetic                               | Tests / offline development                        |
 
@@ -202,6 +203,51 @@ FrameViewerScreen(client = client) { slots ->
 
 The sample app uses that hook to add a "Parsed weight" card driven by
 `WeightFrameParser`.
+
+### Asking the user which protocol to use
+
+By default `FrameViewerScreen` connects with auto-selected strategy. Override `onConnectClick`
+to take control — for example, to show a Material 3 picker:
+
+```kotlin
+import com.ccubas.blueconnect.ui.dialog.ProtocolPickerDialog
+
+var deviceForPicker by remember { mutableStateOf<BluetoothDevice?>(null) }
+
+FrameViewerScreen(
+    client = client,
+    onConnectClick = { device -> deviceForPicker = device },
+)
+
+deviceForPicker?.let { device ->
+    ProtocolPickerDialog(
+        deviceLabel = "${device.name ?: "?"} (${device.address})",
+        onDismiss = { deviceForPicker = null },
+        onSelect = { strategy ->
+            client.connect(device, forcedStrategy = strategy)
+            deviceForPicker = null
+        },
+    )
+}
+```
+
+By default the dialog shows the three single-protocol options
+(`BleOnly`, `ClassicOnly`, `ChipseaOnly`) — the most common picker UX. To include the
+multi-protocol "Auto" strategies, pass them explicitly:
+
+```kotlin
+import com.ccubas.blueconnect.ui.dialog.AutoPickerStrategies
+import com.ccubas.blueconnect.ui.dialog.DefaultPickerStrategies
+
+ProtocolPickerDialog(
+    deviceLabel = …,
+    onDismiss = …,
+    onSelect = …,
+    strategies = DefaultPickerStrategies + AutoPickerStrategies,
+)
+```
+
+Or build any subset you want with `listOf(ConnectionStrategy.BleOnly, …)`.
 
 ---
 
