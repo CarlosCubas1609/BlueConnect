@@ -51,7 +51,7 @@ internal class BluetoothGattManager(private val context: Context) : BaseBluetoot
                     }
                     Log.e(TAG, errorMsg)
                     notifyConnectionFailed(device, errorMsg, attempt)
-                    clearWeightData()
+                    clearFrame()
                     return
                 }
 
@@ -65,7 +65,7 @@ internal class BluetoothGattManager(private val context: Context) : BaseBluetoot
                     BluetoothProfile.STATE_DISCONNECTED -> {
                         Log.d(TAG, "Disconnected from GATT server")
                         notifyDisconnected(device, getDisconnectReason())
-                        clearWeightData()
+                        clearFrame()
                         resetDisconnectFlag()
                     }
 
@@ -178,12 +178,12 @@ internal class BluetoothGattManager(private val context: Context) : BaseBluetoot
                 Log.d(TAG, "Characteristic UUID: ${characteristic.uuid}")
                 Log.d(TAG, "Value size: ${value.size} bytes")
 
-                val rawData = createWeightDataRaw(value)
-                if (rawData != null) {
-                    notifyWeightData(rawData)
-                    Log.d(TAG, "Raw weight data emitted to listener")
+                val frame = createFrame(value)
+                if (frame != null) {
+                    notifyFrame(frame)
+                    Log.d(TAG, "Frame emitted to listener")
                 } else {
-                    Log.w(TAG, "createRawData returned null, no data emitted")
+                    Log.w(TAG, "createFrame returned null, no data emitted")
                 }
             }
 
@@ -201,12 +201,12 @@ internal class BluetoothGattManager(private val context: Context) : BaseBluetoot
                     val value = characteristic.value
                     Log.d(TAG, "Value size: ${value?.size ?: 0} bytes")
 
-                    val rawData = createWeightDataRaw(value)
-                    if (rawData != null) {
-                        notifyWeightData(rawData)
-                        Log.d(TAG, "Raw weight data emitted to listener (legacy)")
+                    val frame = createFrame(value)
+                    if (frame != null) {
+                        notifyFrame(frame)
+                        Log.d(TAG, "Frame emitted to listener (legacy)")
                     } else {
-                        Log.w(TAG, "createRawData returned null, no data emitted (legacy)")
+                        Log.w(TAG, "createFrame returned null, no data emitted (legacy)")
                     }
                 }
             }
@@ -263,7 +263,7 @@ internal class BluetoothGattManager(private val context: Context) : BaseBluetoot
         bluetoothGatt?.disconnect()
         bluetoothGatt?.close()
         bluetoothGatt = null
-        clearWeightData()
+        clearFrame()
     }
 
     @SuppressLint("MissingPermission")
@@ -273,7 +273,7 @@ internal class BluetoothGattManager(private val context: Context) : BaseBluetoot
         bluetoothGatt?.disconnect()
         bluetoothGatt?.close()
         bluetoothGatt = null
-        clearWeightData()
+        clearFrame()
         clearListener()
     }
 }

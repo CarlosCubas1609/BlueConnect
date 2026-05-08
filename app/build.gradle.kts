@@ -5,13 +5,13 @@ plugins {
 }
 
 android {
-    namespace = "com.ccubas.blueconnect"
+    namespace = "com.ccubas.blueconnect.sample"
     compileSdk {
         version = release(36)
     }
 
     defaultConfig {
-        applicationId = "com.ccubas.blueconnect"
+        applicationId = "com.ccubas.blueconnect.sample"
         minSdk = 24
         targetSdk = 36
         versionCode = 1
@@ -42,6 +42,12 @@ android {
 }
 
 dependencies {
+    implementation(project(":core"))
+    implementation(project(":bluetooth"))
+    implementation(project(":storage-datastore"))
+    implementation(project(":parser-weight"))
+    implementation(project(":ui"))
+
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)

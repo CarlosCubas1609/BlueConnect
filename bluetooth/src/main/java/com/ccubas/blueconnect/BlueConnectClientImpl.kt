@@ -15,7 +15,7 @@ import com.ccubas.blueconnect.core.model.ConnectionState
 import com.ccubas.blueconnect.core.model.DeviceInfo
 import com.ccubas.blueconnect.core.model.SavedDevice
 import com.ccubas.blueconnect.core.model.ScanError
-import com.ccubas.blueconnect.core.model.WeightDataRaw
+import com.ccubas.blueconnect.core.model.BluetoothFrame
 import com.ccubas.blueconnect.core.storage.BluetoothSessionStorage
 import com.ccubas.blueconnect.internal.BluetoothEventListener
 import com.ccubas.blueconnect.internal.IBluetoothManager
@@ -328,8 +328,8 @@ internal class BlueConnectClientImpl internal constructor(
     private val _connectionState = MutableStateFlow<ConnectionState>(ConnectionState.Idle)
     override val connectionState: StateFlow<ConnectionState> = _connectionState.asStateFlow()
 
-    private val _weightDataRaw = MutableStateFlow<WeightDataRaw?>(null)
-    override val weightDataRaw: StateFlow<WeightDataRaw?> = _weightDataRaw.asStateFlow()
+    private val _lastFrame = MutableStateFlow<BluetoothFrame?>(null)
+    override val lastFrame: StateFlow<BluetoothFrame?> = _lastFrame.asStateFlow()
 
     @SuppressLint("MissingPermission")
     private fun getConnectionStrategy(device: BluetoothDevice): ConnectionStrategy = when {
@@ -435,7 +435,7 @@ internal class BlueConnectClientImpl internal constructor(
             is ConnectionState.Connected -> ConnectionState.Disconnected(currentState.device, "User initiated")
             else -> ConnectionState.Idle
         }
-        _weightDataRaw.value = null
+        _lastFrame.value = null
 
         currentDeviceAddress?.let { address ->
             deviceConnectionStates[address] = deviceConnectionStates[address]?.copy(
@@ -542,8 +542,8 @@ internal class BlueConnectClientImpl internal constructor(
         }
     }
 
-    override fun onWeightData(raw: WeightDataRaw?) {
-        _weightDataRaw.value = raw
+    override fun onFrame(frame: BluetoothFrame?) {
+        _lastFrame.value = frame
     }
 
     // ==================== SESSION ====================

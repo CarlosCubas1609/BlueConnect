@@ -23,5 +23,6 @@ rootProject.name = "BlueConnect"
 include(":core")
 include(":bluetooth")
 include(":storage-datastore")
+include(":parser-weight")
 include(":ui")
 include(":app")

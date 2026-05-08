@@ -5,7 +5,7 @@ import android.bluetooth.BluetoothDevice
 import android.util.Log
 import com.ccubas.blueconnect.core.model.Attempt
 import com.ccubas.blueconnect.core.model.ConnectionState
-import com.ccubas.blueconnect.core.model.WeightDataRaw
+import com.ccubas.blueconnect.core.model.BluetoothFrame
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -74,7 +74,7 @@ internal class DemoBluetoothManager : IBluetoothManager {
         } else {
             eventListener?.onStateChange(ConnectionState.Idle)
         }
-        eventListener?.onWeightData(null)
+        eventListener?.onFrame(null)
         currentSimulatedDevice = null
     }
 
@@ -84,7 +84,7 @@ internal class DemoBluetoothManager : IBluetoothManager {
         isConnected = false
 
         weightSimulationJob?.cancel()
-        eventListener?.onWeightData(null)
+        eventListener?.onFrame(null)
         currentSimulatedDevice = null
 
         eventListener = null
@@ -122,12 +122,12 @@ internal class DemoBluetoothManager : IBluetoothManager {
 
                 val rawDataString = simulateRawData(currentWeight, isStable)
 
-                val rawData = WeightDataRaw(
+                val frame = BluetoothFrame(
                     data = rawDataString,
                     bytes = null,
                 )
 
-                eventListener?.onWeightData(rawData)
+                eventListener?.onFrame(frame)
                 delay(1000L)
             }
         }

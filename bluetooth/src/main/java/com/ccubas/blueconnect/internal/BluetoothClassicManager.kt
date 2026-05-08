@@ -5,7 +5,7 @@ import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothSocket
 import android.util.Log
 import com.ccubas.blueconnect.core.model.Attempt
-import com.ccubas.blueconnect.core.model.WeightDataRaw
+import com.ccubas.blueconnect.core.model.BluetoothFrame
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -22,7 +22,8 @@ import java.util.UUID
  *
  * Tested with the LP7516 weight indicator, which broadcasts lines like
  * `ST,GS,+ 10.5kg`, but works with any device speaking SPP and emitting newline-terminated
- * text. Parsing is left to [com.ccubas.blueconnect.core.parser.WeightFrameParser].
+ * text. Parsing is the consumer's responsibility — pull in an optional parser module
+ * (e.g. `cc-blueconnect-parser-weight`) or decode frames yourself.
  */
 internal class BluetoothClassicManager : BaseBluetoothManager() {
 
@@ -156,13 +157,13 @@ internal class BluetoothClassicManager : BaseBluetoothManager() {
     private fun emitRawData(line: String) {
         try {
             Log.d(TAG, "Received line: $line")
-            val rawData = WeightDataRaw(
+            val frame = BluetoothFrame(
                 data = line,
                 bytes = null,
             )
-            notifyWeightData(rawData)
+            notifyFrame(frame)
         } catch (e: Exception) {
-            Log.e(TAG, "Error emitting raw weight data", e)
+            Log.e(TAG, "Error emitting frame", e)
         }
     }
 
@@ -180,7 +181,7 @@ internal class BluetoothClassicManager : BaseBluetoothManager() {
             bluetoothSocket?.close()
             device?.let { notifyDisconnected(it, "User initiated") }
             bluetoothSocket = null
-            clearWeightData()
+            clearFrame()
         } catch (e: Exception) {
             Log.e(TAG, "Error disconnecting", e)
         }
@@ -198,7 +199,7 @@ internal class BluetoothClassicManager : BaseBluetoothManager() {
 
             bluetoothSocket?.close()
             bluetoothSocket = null
-            clearWeightData()
+            clearFrame()
             clearListener()
         } catch (e: Exception) {
             Log.e(TAG, "Error closing", e)

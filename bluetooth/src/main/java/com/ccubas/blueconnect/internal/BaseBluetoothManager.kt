@@ -3,8 +3,8 @@ package com.ccubas.blueconnect.internal
 import android.bluetooth.BluetoothDevice
 import android.util.Log
 import com.ccubas.blueconnect.core.model.Attempt
+import com.ccubas.blueconnect.core.model.BluetoothFrame
 import com.ccubas.blueconnect.core.model.ConnectionState
-import com.ccubas.blueconnect.core.model.WeightDataRaw
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
 
@@ -45,8 +45,8 @@ internal abstract class BaseBluetoothManager : IBluetoothManager {
         eventListener?.onStateChange(state)
     }
 
-    protected fun notifyWeightData(data: WeightDataRaw?) {
-        eventListener?.onWeightData(data)
+    protected fun notifyFrame(frame: BluetoothFrame?) {
+        eventListener?.onFrame(frame)
     }
 
     protected fun notifyConnectionFailed(
@@ -66,8 +66,8 @@ internal abstract class BaseBluetoothManager : IBluetoothManager {
         notifyStateChange(ConnectionState.Disconnected(device, reason))
     }
 
-    protected fun clearWeightData() {
-        notifyWeightData(null)
+    protected fun clearFrame() {
+        notifyFrame(null)
     }
 
     protected fun getDisconnectReason(): String =
@@ -104,21 +104,21 @@ internal abstract class BaseBluetoothManager : IBluetoothManager {
     protected fun ByteArray.toHexString(): String =
         joinToString(" ") { "%02X".format(it) }
 
-    protected fun createWeightDataRaw(data: ByteArray?): WeightDataRaw? {
+    protected fun createFrame(data: ByteArray?): BluetoothFrame? {
         if (data == null) {
-            Log.w(TAG, "createRawData: data is NULL")
+            Log.w(TAG, "createFrame: data is NULL")
             return null
         }
 
         if (data.isEmpty()) {
-            Log.w(TAG, "createRawData: data is EMPTY")
+            Log.w(TAG, "createFrame: data is EMPTY")
             return null
         }
 
         val rawHex = data.toHexString()
-        Log.d(TAG, "Raw data received: $rawHex (${data.size} bytes)")
+        Log.d(TAG, "Frame received: $rawHex (${data.size} bytes)")
 
-        return WeightDataRaw(
+        return BluetoothFrame(
             data = rawHex,
             bytes = data,
         )

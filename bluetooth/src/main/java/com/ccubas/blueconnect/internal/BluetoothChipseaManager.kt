@@ -11,7 +11,7 @@ import android.util.Log
 import androidx.core.util.isEmpty
 import androidx.core.util.size
 import com.ccubas.blueconnect.core.model.Attempt
-import com.ccubas.blueconnect.core.model.WeightDataRaw
+import com.ccubas.blueconnect.core.model.BluetoothFrame
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -217,7 +217,7 @@ internal class BluetoothChipseaManager(private val context: Context) : BaseBluet
         }
         targetDeviceAddress = null
 
-        clearWeightData()
+        clearFrame()
     }
 
     override fun close() {
@@ -236,7 +236,7 @@ internal class BluetoothChipseaManager(private val context: Context) : BaseBluet
 
         stopAdvertisementScan()
         targetDeviceAddress = null
-        clearWeightData()
+        clearFrame()
 
         clearListener()
     }
@@ -335,14 +335,14 @@ internal class BluetoothChipseaManager(private val context: Context) : BaseBluet
             Log.d(TAG, "Raw: $rawHex")
             Log.d(TAG, "═══════════════════════════════════════")
 
-            val rawData = WeightDataRaw(
+            val frame = BluetoothFrame(
                 data = rawHex,
                 bytes = data,
             )
 
-            notifyWeightData(rawData)
+            notifyFrame(frame)
         } catch (e: Exception) {
-            Log.e(TAG, "Error emitting Chipsea raw data", e)
+            Log.e(TAG, "Error emitting Chipsea frame", e)
         }
     }
 
@@ -368,14 +368,14 @@ internal class BluetoothChipseaManager(private val context: Context) : BaseBluet
                 Log.d(TAG, "Connected (receiving Custom Chipsea data)")
             }
 
-            val rawData = WeightDataRaw(
+            val frame = BluetoothFrame(
                 data = rawHex,
                 bytes = data,
             )
 
-            notifyWeightData(rawData)
+            notifyFrame(frame)
         } catch (e: Exception) {
-            Log.e(TAG, "Error emitting Custom Chipsea raw data", e)
+            Log.e(TAG, "Error emitting Custom Chipsea frame", e)
         }
     }
 }

@@ -1,11 +1,11 @@
 package com.ccubas.blueconnect.core
 
 import android.bluetooth.BluetoothDevice
+import com.ccubas.blueconnect.core.model.BluetoothFrame
 import com.ccubas.blueconnect.core.model.ConnectionState
 import com.ccubas.blueconnect.core.model.DeviceInfo
 import com.ccubas.blueconnect.core.model.SavedDevice
 import com.ccubas.blueconnect.core.model.ScanError
-import com.ccubas.blueconnect.core.model.WeightDataRaw
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -46,10 +46,11 @@ interface BlueConnectClient {
     val connectionState: StateFlow<ConnectionState>
 
     /**
-     * Latest raw frame received from the connected device. The SDK does not parse —
-     * use [com.ccubas.blueconnect.core.parser.WeightFrameParser] or roll your own.
+     * Latest frame received from the connected device. The SDK does not parse —
+     * decode it yourself or pull in an optional parser module
+     * (e.g. `cc-blueconnect-parser-weight` for weight-scale protocols).
      */
-    val weightDataRaw: StateFlow<WeightDataRaw?>
+    val lastFrame: StateFlow<BluetoothFrame?>
 
     /**
      * Begin connecting to [device]. The wrapper picks a strategy based on device type
