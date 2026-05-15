@@ -51,12 +51,12 @@ dependencyResolutionManagement {
 
 ```kotlin
 dependencies {
-    implementation("com.github.CarlosCubas1609.cc-blueconnect-sdk:bluetooth:1.0.0")
+    implementation("com.github.CarlosCubas1609.cc-blueconnect-sdk:bluetooth:1.0.1")
 
     // Optional add-ons (each one is opt-in):
-    implementation("com.github.CarlosCubas1609.cc-blueconnect-sdk:storage-datastore:1.0.0")
-    implementation("com.github.CarlosCubas1609.cc-blueconnect-sdk:parser-weight:1.0.0")
-    implementation("com.github.CarlosCubas1609.cc-blueconnect-sdk:ui:1.0.0")
+    implementation("com.github.CarlosCubas1609.cc-blueconnect-sdk:storage-datastore:1.0.1")
+    implementation("com.github.CarlosCubas1609.cc-blueconnect-sdk:parser-weight:1.0.1")
+    implementation("com.github.CarlosCubas1609.cc-blueconnect-sdk:ui:1.0.1")
 }
 ```
 
@@ -421,6 +421,30 @@ containing the version directory you published.
 
 > The bundled `gradlew.bat` ships with a known Java 20+ incompatibility (passes an empty
 > `-classpath`). On Windows + JDK 20+, run via `bash gradlew …` or upgrade the wrapper.
+
+## Changelog
+
+### 1.0.1
+
+**Fixes**
+
+- Scan now also surfaces Bluetooth Classic devices that aren't yet paired. Previously
+  `client.startScan()` only ran a BLE advertisement scan, so Classic-only peripherals
+  (LP7516 weight indicators, POS printers, older SPP devices) were invisible until the user
+  manually paired them from the system Bluetooth settings.
+
+**Internal**
+
+- Discovery was refactored behind a new `IScanSource` abstraction with one implementation
+  per transport (bonded / BLE / Classic inquiry / Demo) merged via `flatMapMerge`. Adding a
+  new transport is now a single new file; the coordinator stays unchanged. No public API
+  change — drop in the new version.
+
+### 1.0.0
+
+- Initial release.
+
+---
 
 ## Roadmap
 

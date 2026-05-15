@@ -4,6 +4,7 @@ import android.content.Context
 import com.ccubas.blueconnect.core.BlueConnectClient
 import com.ccubas.blueconnect.core.storage.BluetoothSessionStorage
 import com.ccubas.blueconnect.internal.BluetoothManagerFactory
+import com.ccubas.blueconnect.internal.scan.ScannerFactory
 import com.ccubas.blueconnect.storage.InMemorySessionStorage
 
 /**
@@ -40,6 +41,7 @@ object BlueConnect {
         return BlueConnectClientImpl(
             context = appContext,
             managerFactory = BluetoothManagerFactory(appContext),
+            scannerFactory = ScannerFactory(appContext),
             sessionStorage = storage,
         )
     }

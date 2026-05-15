@@ -2,9 +2,6 @@ package com.ccubas.blueconnect
 
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothDevice
-import android.bluetooth.le.ScanCallback
-import android.bluetooth.le.ScanResult
-import android.bluetooth.le.ScanSettings
 import android.content.Context
 import android.util.Log
 import com.ccubas.blueconnect.core.BlueConnectClient
@@ -20,10 +17,14 @@ import com.ccubas.blueconnect.core.storage.BluetoothSessionStorage
 import com.ccubas.blueconnect.internal.BluetoothEventListener
 import com.ccubas.blueconnect.internal.IBluetoothManager
 import com.ccubas.blueconnect.internal.IBluetoothManagerFactory
+import com.ccubas.blueconnect.internal.scan.IScanSource
+import com.ccubas.blueconnect.internal.scan.IScannerFactory
+import com.ccubas.blueconnect.internal.scan.ScanEvent
 import com.ccubas.blueconnect.permission.BluetoothPermissionUtils
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
@@ -31,9 +32,12 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.flatMapMerge
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import android.bluetooth.BluetoothManager as AndroidBluetoothManager
 
@@ -41,7 +45,10 @@ import android.bluetooth.BluetoothManager as AndroidBluetoothManager
  * Default [BlueConnectClient] implementation. The "wrapper / coordinator" in the architecture:
  *
  * - Owns the single source of truth for scan results and connection state (StateFlows).
- * - Delegates scanning to the platform BLE scanner (or to the Demo path when in demo mode).
+ * - Delegates scanning to a list of [com.ccubas.blueconnect.internal.scan.IScanSource]s
+ *   produced by [IScannerFactory] (bonded + BLE + Classic in real mode, Demo in demo mode)
+ *   and merges their flows. Adding a transport is just adding a source — the coordinator
+ *   stays unchanged.
  * - Picks a [ConnectionStrategy] based on device type, then routes connect/disconnect to the
  *   matching transport manager via [IBluetoothManagerFactory]. Falls back across protocols
  *   when a strategy lists more than one.
@@ -54,6 +61,7 @@ import android.bluetooth.BluetoothManager as AndroidBluetoothManager
 internal class BlueConnectClientImpl internal constructor(
     private val context: Context,
     private val managerFactory: IBluetoothManagerFactory,
+    private val scannerFactory: IScannerFactory,
     private val sessionStorage: BluetoothSessionStorage,
     ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : BlueConnectClient, BluetoothEventListener {
@@ -79,10 +87,16 @@ internal class BlueConnectClientImpl internal constructor(
     override val scanError: SharedFlow<ScanError> = _scanError.asSharedFlow()
 
     private var scanJob: Job? = null
-    private var currentScanCallback: ScanCallback? = null
-    private var currentBluetoothLeScanner: android.bluetooth.le.BluetoothLeScanner? = null
 
     // ==================== SCAN ====================
+    //
+    // Discovery is fanned out to a list of `IScanSource`s (bonded / BLE / Classic / Demo)
+    // built by the injected `IScannerFactory`. The coordinator only:
+    //   1. Runs preflight (permissions + adapter checks) once.
+    //   2. Merges every source's flow with `flatMapMerge`.
+    //   3. Stops the merged collection after `durationMs` — cancellation propagates to each
+    //      source's `awaitClose`, so cleanup is structural.
+    // Adding a new transport means adding a new `IScanSource`; the coordinator stays the same.
 
     @SuppressLint("MissingPermission")
     override suspend fun startScan(durationMs: Long) {
@@ -91,201 +105,67 @@ internal class BlueConnectClientImpl internal constructor(
             stopScan()
         }
 
+        if (!preflight()) return
+
         _isScanning.value = true
         clearDevices()
 
-        if (isDemoMode) {
-            startDemoScan(durationMs)
-        } else {
-            startRealScan(durationMs)
-        }
-    }
+        val sources = scannerFactory.createScanSources(isDemoMode, durationMs)
+        Log.d(TAG, "Starting scan with sources: ${sources.joinToString { it.name }}")
 
-    @SuppressLint("MissingPermission")
-    private fun startDemoScan(durationMs: Long) {
         scanJob = scope.launch {
+            val collectJob = launch { collectScanSources(sources) }
             try {
-                val androidBluetoothManager =
-                    context.getSystemService(Context.BLUETOOTH_SERVICE) as? AndroidBluetoothManager
-                val bluetoothAdapter = androidBluetoothManager?.adapter
-
-                if (bluetoothAdapter == null) {
-                    Log.e(TAG, "Cannot get BluetoothAdapter for DEMO mode")
-                    _isScanning.value = false
-                    _scanError.emit(ScanError.AdapterNotAvailable("Bluetooth is not available on this device"))
-                    return@launch
-                }
-
-                val demoDevices = listOf(
-                    Triple("Demo Scale 1", "AA:BB:CC:DD:EE:01", -45),
-                    Triple("Demo Scale 2", "AA:BB:CC:DD:EE:02", -52),
-                    Triple("Demo Scale 3", "AA:BB:CC:DD:EE:03", -38),
-                    Triple("Demo Industrial Scale", "AA:BB:CC:DD:EE:04", -68),
-                    Triple("Demo BT Scale", "AA:BB:CC:DD:EE:05", -75),
-                    Triple("Demo Test Scale", "AA:BB:CC:DD:EE:06", -60),
-                )
-
-                val delayBetweenDevices = (durationMs / demoDevices.size).coerceAtLeast(100L)
-
-                demoDevices.forEachIndexed { _, (name, address, rssi) ->
-                    if (!_isScanning.value) return@launch
-
-                    delay(delayBetweenDevices)
-
-                    try {
-                        val device = try {
-                            bluetoothAdapter.bondedDevices?.find { it.address == address }
-                        } catch (_: SecurityException) {
-                            Log.w(TAG, "Permission not granted for bonded devices, creating remote device")
-                            null
-                        } ?: bluetoothAdapter.getRemoteDevice(address)
-
-                        addDevice(device, rssi)
-                        Log.d(TAG, "DEMO device added: $name ($address)")
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Error creating DEMO device: ${e.message}")
-                    }
-                }
-
-                Log.d(TAG, "DEMO scan completed — ${_discoveredDevices.value.size} devices found")
-            } catch (e: Exception) {
-                Log.e(TAG, "Error during DEMO scan: ${e.message}", e)
+                delay(durationMs)
             } finally {
+                collectJob.cancel()
                 _isScanning.value = false
+                Log.d(TAG, "Scan window finished")
             }
         }
     }
 
-    @SuppressLint("MissingPermission")
-    private fun startRealScan(durationMs: Long) {
+    /** Returns true if the scan is allowed to proceed; emits a `ScanError` otherwise. */
+    private suspend fun preflight(): Boolean {
+        if (isDemoMode) return true
+
         if (!BluetoothPermissionUtils.hasBluetoothPermissions(context)) {
             Log.e(TAG, "Bluetooth permissions not granted")
-            _isScanning.value = false
-            scope.launch {
-                _scanError.emit(ScanError.PermissionDenied("Bluetooth permissions are required"))
-            }
-            return
+            _scanError.emit(ScanError.PermissionDenied("Bluetooth permissions are required"))
+            return false
         }
 
-        val androidBluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as? AndroidBluetoothManager
-        val bluetoothAdapter = androidBluetoothManager?.adapter
-        val bluetoothLeScanner = bluetoothAdapter?.bluetoothLeScanner
-
-        if (bluetoothAdapter == null) {
+        val adapter = (context.getSystemService(Context.BLUETOOTH_SERVICE) as? AndroidBluetoothManager)?.adapter
+        if (adapter == null) {
             Log.e(TAG, "Bluetooth adapter not available")
-            _isScanning.value = false
-            scope.launch {
-                _scanError.emit(ScanError.AdapterNotAvailable("Bluetooth is not available on this device"))
-            }
-            return
+            _scanError.emit(ScanError.AdapterNotAvailable("Bluetooth is not available on this device"))
+            return false
         }
-
-        if (!bluetoothAdapter.isEnabled) {
+        if (!adapter.isEnabled) {
             Log.e(TAG, "Bluetooth is not enabled")
-            _isScanning.value = false
-            scope.launch {
-                _scanError.emit(ScanError.BluetoothDisabled("Please turn on Bluetooth to scan for devices"))
-            }
-            return
+            _scanError.emit(ScanError.BluetoothDisabled("Please turn on Bluetooth to scan for devices"))
+            return false
         }
-
-        try {
-            bluetoothAdapter.bondedDevices?.forEach { device ->
-                addDevice(device, rssi = 0)
-                Log.d(TAG, "Bonded device added: ${device.address}")
-            }
-        } catch (e: SecurityException) {
-            Log.e(TAG, "Permission not granted to access bonded devices: ${e.message}")
-            _isScanning.value = false
-            scope.launch {
-                _scanError.emit(ScanError.PermissionDenied("Bluetooth permissions are required"))
-            }
-            return
-        }
-
-        if (bluetoothLeScanner != null) {
-            currentBluetoothLeScanner = bluetoothLeScanner
-            currentScanCallback = object : ScanCallback() {
-                override fun onScanResult(callbackType: Int, result: ScanResult?) {
-                    result?.let { scanResult ->
-                        addDevice(scanResult.device, scanResult.rssi)
-                    }
-                }
-
-                override fun onBatchScanResults(results: MutableList<ScanResult>?) {
-                    results?.forEach { scanResult ->
-                        addDevice(scanResult.device, scanResult.rssi)
-                    }
-                }
-
-                override fun onScanFailed(errorCode: Int) {
-                    Log.e(TAG, "Scan failed with error code: $errorCode")
-                    _isScanning.value = false
-                    scope.launch {
-                        _scanError.emit(ScanError.ScanFailed("Failed to scan for devices", errorCode))
-                    }
-                }
-            }
-
-            val scanSettings = ScanSettings.Builder()
-                .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
-                .build()
-
-            try {
-                bluetoothLeScanner.startScan(null, scanSettings, currentScanCallback)
-                Log.d(TAG, "BLE scan started")
-
-                scanJob = scope.launch {
-                    delay(durationMs)
-                    try {
-                        currentBluetoothLeScanner?.stopScan(currentScanCallback)
-                        Log.d(TAG, "BLE scan stopped")
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Error stopping scan", e)
-                    } finally {
-                        _isScanning.value = false
-                        currentScanCallback = null
-                        currentBluetoothLeScanner = null
-                    }
-                }
-            } catch (e: SecurityException) {
-                Log.e(TAG, "SecurityException: missing Bluetooth permissions", e)
-                _isScanning.value = false
-                currentScanCallback = null
-                currentBluetoothLeScanner = null
-                scope.launch {
-                    _scanError.emit(ScanError.PermissionDenied("Bluetooth permissions are required"))
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error starting scan", e)
-                _isScanning.value = false
-                currentScanCallback = null
-                currentBluetoothLeScanner = null
-            }
-        } else {
-            Log.w(TAG, "BLE scanner not available")
-            _isScanning.value = false
-        }
+        return true
     }
 
-    @SuppressLint("MissingPermission")
-    override fun stopScan() {
-        try {
-            currentScanCallback?.let { callback ->
-                currentBluetoothLeScanner?.stopScan(callback)
-                Log.d(TAG, "BLE scan stopped manually")
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private suspend fun collectScanSources(sources: List<IScanSource>) {
+        sources.asFlow()
+            .flatMapMerge { source -> source.scan() }
+            .collect { event ->
+                when (event) {
+                    is ScanEvent.DeviceFound -> addDevice(event.device, event.rssi)
+                    is ScanEvent.Error -> _scanError.emit(event.error)
+                }
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error stopping BLE scan", e)
-        }
+    }
 
+    override fun stopScan() {
         scanJob?.cancel()
         scanJob = null
-
-        currentScanCallback = null
-        currentBluetoothLeScanner = null
-
         _isScanning.value = false
+        Log.d(TAG, "Scan stopped by user")
     }
 
     override fun clearDevices() {
@@ -294,9 +174,9 @@ internal class BlueConnectClientImpl internal constructor(
 
     @SuppressLint("MissingPermission")
     private fun addDevice(device: BluetoothDevice, rssi: Int) {
-        val currentDevices = _discoveredDevices.value.toMutableMap()
-        currentDevices[device.address] = DeviceInfo(device = device, rssi = rssi)
-        _discoveredDevices.value = currentDevices
+        _discoveredDevices.update { current ->
+            current + (device.address to DeviceInfo(device = device, rssi = rssi))
+        }
         Log.d(TAG, "Device discovered: ${device.address} | Name: '${device.name}' | Type: ${device.type} | RSSI: $rssi")
     }
 
